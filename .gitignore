@@ -1,10 +1,13 @@
-# .gitignore.public (super strict for public repo)
-# Ignore all private configs, secrets, and local/dev artifacts
+# contract-cli public .gitignore
+
+# Sensitive configs and secrets
+.env
 config/tables.json
 config/table_columns/*.json
-.env
+
+# Build artifacts and editor files
 /target/
-/*.rs.bk
+*.rs.bk
 .DS_Store
 Thumbs.db
 .vscode/
@@ -12,13 +15,17 @@ Thumbs.db
 *.swp
 *.swo
 *~
+
+# Local databases, logs, and reports
 *.sqlite
-data/**/*.csv
-!data/examples/sample.csv
 *.log
 reports/
 
-# Only allow templates and examples
+# Data files (ignore all CSVs except sample)
+data/**/*.csv
+!data/examples/sample.csv
+
+# Allow only public templates and examples
 !config/tables.template.json
 !config/table_columns/*.template.json
 !data/examples/sample.csv
