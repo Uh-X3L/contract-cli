@@ -1,151 +1,164 @@
 # 🧾 contract-cli
 
-> A simple, testable smart contract simulation CLI — built in Rust with SQLite and `clap`.
+A simple, testable smart contract simulation CLI — built in Rust with SQLite and clap, extended with CSV profiling and JSON-based metadata support.
 
-This CLI simulates wallet-like smart contract behaviors: deposits, withdrawals, balance checks, and transaction logs — all backed by a lightweight SQLite database.  
-
-Built as part of a Rust blockchain engineering journey, it focuses on clean architecture, testability, and data safety.
-
----
+This CLI lets you:
+- Simulate wallet-like smart contract behaviors: deposits, withdrawals, balance checks, transaction logs
+- Profile CSV files to summarize schema, data types, row counts, and missing values
+- Manage table and column metadata via JSON configs
 
 ## ✨ Features
 
-- 🔐 Owner identity is hashed using SHA-512 (64-bit collision-safe) for secure and consistent IDs  
-- 💰 Deposit and withdraw functionality (with safe DB checks)  
-- 🧾 View recent transaction history (limited to last 5)  
-- 🗃️ SQLite database storage for state persistence  
-- 🔑 Safe SQL using parameterized queries (`params![]`) to prevent injection  
-- 📦 Modern CLI interface using [`clap`](https://crates.io/crates/clap)  
-- 🧪 In-memory unit tests for full logic coverage  
+### Smart Contract Simulation
+- **Owner Identity** hashed using SHA-512 for secure, consistent IDs
+- **Deposits & Withdrawals** with safe database checks and transaction logging
+- **Transaction History** view (last 5 entries)
+- **SQLite Storage** for persistent state
+- **Safe SQL** via parameterized queries (`params![]`) to prevent injection
+- **Unit Tests** covering core logic
+- **CLI** built with clap
 
----
+### Data Profiling & Metadata
+- **CSV Profiler**: quick summary of schema & data quality
+- **Polars Integration** for fast DataFrame operations (CSV, Parquet, JSON)
+- **Parallel Processing** with Rayon
+- **JSON Configs**: define tables (`config/tables.template.json`) and columns (`config/table_columns/*.template.json`)
 
 ## 📦 Installation
 
 ### Prerequisites
+- Rust (via rustup)
+- SQLite development libraries
 
-- Rust (via [rustup.rs](https://rustup.rs))  
-- SQLite development libraries:
-
+On Debian/Ubuntu:
 ```bash
-# Linux / WSL (Debian-based)
 sudo apt update
 sudo apt install libsqlite3-dev
 ```
 
----
-
 ### Clone & Build
-
 ```bash
-git clone https://github.com/Uh-X3L/rust-journey.git
-cd rust-journey/z_small_projects/contract-cli
-cargo build
+git clone https://github.com/Uh-X3L/contract-cli.git
+cd contract-cli
+cargo build --release
 ```
 
----
+## 🔧 Setup
+
+1. **Config Templates**  
+   Copy the provided JSON templates to real config files:
+   ```bash
+   cp config/tables.template.json config/tables.json
+   cp config/table_columns/*.template.json config/table_columns/
+   ```
+2. **Environment Variables**  
+   Copy `.env.example` to `.env` and fill in your values:
+   ```bash
+   cp .env.example .env
+   ```
+3. **Build & Run**  
+   ```bash
+   cargo run --release -- [COMMAND]
+   ```
 
 ## 🚀 Usage
 
+### Smart Contract Commands
 ```bash
-cargo run -- --owner alice status
+# Check balance
+cargo run -- profile --owner alice status
+
+# Deposit funds
 cargo run -- --owner alice deposit --amount 200
+
+# Withdraw funds
 cargo run -- --owner alice withdraw --amount 50
+
+# Show history
 cargo run -- --owner alice history
 ```
 
-### Example Output
-
+### CSV Profiling
 ```bash
-$ cargo run -- --owner alice status
-👤 Owner: alice
-💰 Balance: 150
-
-$ cargo run -- --owner alice history
-📜 Last 5 transactions for alice:
-123 | deposit: 200
-124 | withdraw: 50
+cargo run -- profile --input path/to/file.csv [--delimiter ,]
 ```
 
----
+#### Example
+```bash
+cargo run -- profile --input data/examples/sample.csv
+```
 
-## 🧪 Running Tests
+Sample output:
+```
+Rows: 3
 
-This project includes unit tests for deposit, withdrawal, owner isolation, and transaction logic.
+COLUMN             TYPE       NULLS
+--------------------------------------------------
+id                 Int64      0
+name               Utf8       0
+amount             Int64      1
+notes              Utf8       1
+```
 
+## 🧪 Testing
+
+Run all tests:
 ```bash
 cargo test
 ```
 
-To display test output (e.g. println!):
-
+Show test output:
 ```bash
 cargo test -- --nocapture
 ```
-
----
 
 ## 📁 Project Structure
 
 ```
 contract-cli/
+├── config/
+│   ├── tables.template.json
+│   └── table_columns/
+│       └── users.template.json
+├── data/
+│   └── examples/
+│       └── sample.csv
 ├── src/
-│   ├── main.rs           # CLI & command routing
-│   ├── contract.rs       # Core smart contract logic
+│   ├── main.rs
+│   ├── contract.rs
 │   ├── db/
-│   │   ├── mod.rs        # DB connection and setup
-│   │   └── migrations.rs # DB schema & future upgrades
-│   └── utils/
-│       └── hash.rs       # Owner hashing utility (SHA-512)
+│   │   ├── mod.rs
+│   │   └── migrations.rs
+│   ├── profiler.rs
+│   ├── utils/
+│   │   ├── hash.rs
+│   │   └── display.rs
+│   └── config.rs
+├── tests/
+│   └── integration_test.rs
 ├── Cargo.toml
+├── .gitignore
 └── README.md
 ```
 
----
-
 ## 🔐 Security Notes
-
-Rust encourages safe practices by design.  
-All SQL operations use parameterized queries to avoid injection:
-
-```rust
-conn.prepare("SELECT ... WHERE id = ?1")?.query(params![id])?;
-```
-
-Using this approach:
-- ✅ protects from SQL injection
-- ✅ ensures consistent type handling
-- ✅ improves query reusability and performance
-
----
+- All SQL uses parameterized queries (`params![]`)
+- Owner hashing with `sha2::Sha512` ensures collision resistance
 
 ## 👨‍🔬 Learning Highlights
-
-- ✅ Modular Rust design (submodules for utils/db)  
-- ✅ Secure hashing with `sha2` for identity handling  
-- ✅ SQLite via `rusqlite` with safe `Result<T>`-based error handling  
-- ✅ CLI structure and command parsing with `clap`  
-- ✅ Hands-on practice with unit tests, schema integrity, and constraint checks  
-
----
+- Modular Rust design with submodules
+- Safe error handling with `anyhow` and `Result`
+- Data profiling via Polars & parallelism with Rayon
+- JSON-based config management with Serde & Chrono
+- CLI design using Clap and logging via env_logger
 
 ## 🛣️ Roadmap
+- JSON export of profiling results
+- Parquet & JSON profiling extensions
+- Caching & incremental profiling
+- Integration with NoSQL metadata store
+- JSON export of profiling results
+- Parquet & JSON profiling extensions
+- Caching & incremental profiling
+- Integration with NoSQL metadata store
 
-- [x] Multi-user contract support via hashed IDs  
-- [x] Enforced constraint-safe logging (no negative amounts)  
-- [ ] Export history to CSV/JSON  
-- [ ] CLI auto-complete / interactive mode  
-- [ ] Optional web interface via `actix-web`  
-
----
-
-## 📚 License
-
-MIT — free to use and build upon.
-
----
-
-## 🤝 Credits
-
-Built with ❤️ during my Rust + Blockchain engineering transition.  
-Follow the journey: [github.com/Uh-X3L](https://github.com/Uh-X3L)

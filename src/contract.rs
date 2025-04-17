@@ -65,37 +65,32 @@ impl Contract {
     }
 
     pub fn deposit(&mut self, conn: &Connection, amount: u64) -> Result<()> {
-        //add a check to see if the amount is greater than 0
         if amount == 0 {
             warn!("⚠️ Deposit failed. Amount must be greater than 0.");
             return Ok(());
         }
-
-        // First verify contract exists in the database before proceeding
-        let mut stmt = conn.prepare("SELECT contract_id FROM contract WHERE contract_id = ?1")?;
+        let tx = conn.transaction()?;
+        let mut stmt = tx.prepare("SELECT contract_id FROM contract WHERE contract_id = ?1")?;
         let contract_exists = stmt.exists(params![&self.contract_id])?;
-
         if !contract_exists {
-            // Re-create the contract if it doesn't exist (should not happen, but just in case)
-            conn.execute(
+            tx.execute(
                 "INSERT INTO contract (contract_id, owner, balance) VALUES (?1, ?2, ?3)",
                 params![&self.contract_id, &self.owner, 0],
             )?;
         }
-
         self.balance += amount;
-        self.update_balance(conn)?;
-        match self.log_transaction(conn, amount as i64, "deposit") {
+        self.update_balance_tx(&tx)?;
+        match self.log_transaction_tx(&tx, amount as i64, "deposit") {
             Ok(_) => {
+                tx.commit()?;
                 println!("✅ Transaction successful!");
                 println!("➡️  Action: Deposit");
                 println!("💵  Amount: {}", amount);
                 println!("📊  New Balance: {}", self.balance);
             }
             Err(e) => {
-                // Rollback the balance update if transaction logging fails
+                tx.rollback()?;
                 self.balance -= amount;
-                self.update_balance(conn)?;
                 println!("❌ Transaction failed: {}", e);
                 return Err(e);
             }
@@ -104,18 +99,28 @@ impl Contract {
     }
 
     pub fn withdraw(&mut self, conn: &Connection, amount: u64) -> Result<()> {
-        //add a check to see if the amount is greater than 0
         if amount == 0 {
             warn!("⚠️ Withdrawal failed. Amount must be greater than 0.");
             return Ok(());
         }
         if self.balance >= amount {
+            let tx = conn.transaction()?;
             self.balance -= amount;
-            self.update_balance(conn)?;
-            self.log_transaction(conn, amount as i64, "withdraw")?;
-            println!("➡️  Action: Withdraw");
-            println!("💵  Amount: {}", amount);
-            println!("📊  New Balance: {}", self.balance);
+            self.update_balance_tx(&tx)?;
+            match self.log_transaction_tx(&tx, amount as i64, "withdraw") {
+                Ok(_) => {
+                    tx.commit()?;
+                    println!("➡️  Action: Withdraw");
+                    println!("💵  Amount: {}", amount);
+                    println!("📊  New Balance: {}", self.balance);
+                }
+                Err(e) => {
+                    tx.rollback()?;
+                    self.balance += amount;
+                    println!("❌ Transaction failed: {}", e);
+                    return Err(e);
+                }
+            }
         } else {
             println!("❌ Withdrawal failed. Insufficient balance.");
             println!("💰 Current Balance: {}", self.balance);
@@ -156,8 +161,15 @@ impl Contract {
         Ok(())
     }
 
+    fn update_balance_tx(&self, tx: &rusqlite::Transaction) -> Result<()> {
+        tx.execute(
+            "UPDATE contract SET balance = ?1 WHERE contract_id = ?2",
+            params![self.balance, self.contract_id],
+        )?;
+        Ok(())
+    }
+
     fn log_transaction(&self, conn: &Connection, amount: i64, tx_type: &str) -> Result<()> {
-        // First check if contract exists before logging transaction
         let mut check_stmt = conn.prepare("SELECT 1 FROM contract WHERE contract_id = ?1")?;
         let exists = check_stmt.exists(params![&self.contract_id])?;
 
@@ -172,6 +184,26 @@ impl Contract {
         }
 
         conn.execute(
+            "INSERT INTO transactions (contract_id, tx_type, amount)
+             VALUES (?1, ?2, ?3)",
+            params![&self.contract_id, tx_type, amount],
+        )?;
+        Ok(())
+    }
+
+    fn log_transaction_tx(&self, tx: &rusqlite::Transaction, amount: i64, tx_type: &str) -> Result<()> {
+        let mut check_stmt = tx.prepare("SELECT 1 FROM contract WHERE contract_id = ?1")?;
+        let exists = check_stmt.exists(params![&self.contract_id])?;
+        if !exists {
+            return Err(rusqlite::Error::SqliteFailure(
+                rusqlite::ffi::Error::new(787),
+                Some(format!(
+                    "Contract ID {} not found in contract table",
+                    self.contract_id
+                )),
+            ));
+        }
+        tx.execute(
             "INSERT INTO transactions (contract_id, tx_type, amount)
              VALUES (?1, ?2, ?3)",
             params![&self.contract_id, tx_type, amount],

@@ -1,36 +1,24 @@
-# — Rust build artifacts —
-target/                   # compiled binaries & intermediate files
-**/*.rs.bk                # any editor backups of your source
-
-# — OS / editor cruft —
+# .gitignore.public (super strict for public repo)
+# Ignore all private configs, secrets, and local/dev artifacts
+config/tables.json
+config/table_columns/*.json
+.env
+/target/
+/*.rs.bk
 .DS_Store
 Thumbs.db
 .vscode/
 .idea/
 *.swp
 *.swo
-*~                       # Emacs backup files
-#*#                      # more Emacs temp files
-
-# — dotenv & local secrets —
-.env                     # local env vars (API keys, DB URLs, etc.)
-
-# — Private config JSONs (real metadata) —
-config/tables.json
-config/table_columns/*.json
-
-# — Share only example/templates — 
-!config/tables.example.json
-!config/table_columns/*.example.json
-
-# — Local databases & scratch data —
+*~
 *.sqlite
-
-# — CSV data — 
-# ignore all CSVs by default, but keep our sample example
 data/**/*.csv
 !data/examples/sample.csv
-
-# — Logs & reports —
 *.log
 reports/
+
+# Only allow templates and examples
+!config/tables.template.json
+!config/table_columns/*.template.json
+!data/examples/sample.csv

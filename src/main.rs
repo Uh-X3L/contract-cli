@@ -3,6 +3,11 @@ use contract_cli::db::run_migrations;
 use contract_cli::{Contract, establish_connection, utils}; // from lib.rs
 use env_logger; // added import
 
+mod profiler;
+mod utils;
+mod utils::display;
+mod config;
+
 #[derive(Parser)]
 #[command(name = "Contract CLI")]
 #[command(about = "Interact with your contract", long_about = None)]
@@ -38,6 +43,16 @@ enum Commands {
         #[arg(long)]
         filename: String,
     },
+
+    /// Profile a CSV file (schema, nulls, count)
+    Profile {
+        /// Path to CSV file
+        #[arg(long, value_name = "FILE")]
+        input: std::path::PathBuf,
+        /// Delimiter (default: ,)
+        #[arg(long, default_value = ",")]
+        delimiter: char,
+    },
 }
 
 fn main() -> anyhow::Result<()> {
@@ -56,6 +71,10 @@ fn main() -> anyhow::Result<()> {
         Commands::History => contract.show_history(&conn)?,
         Commands::Migrate { filename } => {
             run_migrations(&conn, &filename)?;
+        }
+        Commands::Profile { input, delimiter } => {
+            let (rows, prof) = profiler::profile_csv(&input, delimiter as u8)?;
+            utils::display::print_profile(rows, prof);
         }
     }
 
